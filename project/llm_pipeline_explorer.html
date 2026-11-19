@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Pipeline Explorer</title>
+  <!-- Load Inter font for clean, legible educational typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Load Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#2563eb',
+              600: '#1d6ce0',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Base styling & custom subtle scrollbars */
+    html, body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Custom range slider styling matching royal blue design */
+    input[type="range"].vocab-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"].vocab-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #1d6ce0;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    input[type="range"].vocab-slider::-webkit-slider-thumb:hover {
+      background: #1d4ed8;
+      transform: scale(1.1);
+    }
+
+    input[type="range"].vocab-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #1d6ce0;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    /* Clean custom scrollbar for vocabulary table */
+    .vocab-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .vocab-scroll::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .vocab-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .vocab-scroll::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Token chip subtle pop-in animation */
+    @keyframes tokenAppear {
+      from {
+        opacity: 0;
+        transform: translateY(4px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .token-chip {
+      animation: tokenAppear 0.18s ease-out both;
+    }
+
+    /* 3D canvas touch handling */
+    #embeddingCanvas {
+      touch-action: none;
+      cursor: grab;
+    }
+    #embeddingCanvas:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#f8fafc] text-slate-900 py-6 px-4 sm:px-6 lg:px-8">
+
+  <!-- Main Centered Container -->
+  <main class="max-w-4xl mx-auto space-y-8">
+
+    <!-- Subtle Top Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1">
+      <div>
+        <div class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#1d6ce0] bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full mb-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#1d6ce0]"></span>
+          Interactive NLP Visualizer
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">LLM Pipeline Explorer</h1>
+      </div>
+      <p class="text-xs sm:text-sm text-slate-500 max-w-xs">
+        Explore how text becomes numeric token IDs and points in 3D semantic space.
+      </p>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- PART 1: TOKENIZER                                                     -->
+    <!-- ===================================================================== -->
+    <section id="part1-tokenizer" class="bg-white border border-[#e2e8f0] rounded-2xl shadow-sm p-5 sm:p-8 space-y-6">
+      <div class="border-b border-slate-100 pb-4">
+        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Part 1: Tokenizer</h2>
+      </div>
+
+      <!-- Training Sentences Input -->
+      <div class="space-y-2">
+        <label for="trainingSentences" class="block text-sm font-semibold text-slate-800">
+          Training sentences
+        </label>
+        <textarea
+          id="trainingSentences"
+          rows="6"
+          class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-[15px] leading-relaxed text-slate-800 shadow-xs focus:border-[#1d6ce0] focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition"
+          spellcheck="false"
+        >The cat sat on the mat.
+The dog sat on the rug.
+The cat likes the dog.
+The sun is hot today.
+I like my cat and my dog.
+The dog ran to the park.</textarea>
+      </div>
+
+      <!-- Build Vocabulary Button & Summary Readout -->
+      <div class="space-y-3">
+        <button
+          id="buildVocabBtn"
+          type="button"
+          class="inline-flex items-center justify-center rounded-lg bg-[#1d6ce0] hover:bg-[#1d4ed8] active:scale-[0.99] text-white font-medium text-sm px-4 py-2.5 shadow-xs transition cursor-pointer"
+        >
+          Build vocabulary
+        </button>
+
+        <p id="vocabSummaryText" class="text-sm text-slate-700 font-medium">
+          Vocabulary size: <span class="font-semibold text-slate-900">72</span> tokens = 1 [UNK] + <span class="font-semibold text-slate-900">20</span> words + 51 letter pieces
+        </p>
+      </div>
+
+      <!-- Interactive Words Kept Slider -->
+      <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between">
+          <label for="wordsKeptSlider" id="wordsKeptLabel" class="text-sm font-semibold text-slate-800">
+            Words kept: 20 of 20
+          </label>
+          <span class="text-xs text-slate-400 hidden sm:inline">Drag to shrink or expand vocabulary</span>
+        </div>
+        <input
+          id="wordsKeptSlider"
+          type="range"
+          min="0"
+          max="20"
+          value="20"
+          class="vocab-slider"
+        />
+      </div>
+
+      <!-- Vocabulary Table -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+        <div class="vocab-scroll max-h-[260px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-50/95 backdrop-blur-xs sticky top-0 z-10 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <tr>
+                <th class="py-2.5 px-4 w-24">ID</th>
+                <th class="py-2.5 px-4">Token</th>
+                <th class="py-2.5 px-4 w-32">Count</th>
+              </tr>
+            </thead>
+            <tbody id="vocabTableBody" class="divide-y divide-slate-100 text-slate-800">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sentence Encoder Subsection -->
+      <div class="pt-3 border-t border-slate-100 space-y-4">
+        <div class="space-y-2">
+          <label for="encodeInput" class="block text-sm font-semibold text-slate-800">
+            Encode a sentence
+          </label>
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <input
+              id="encodeInput"
+              type="text"
+              value="the antaksh cat sat"
+              placeholder="Type a sentence to tokenize..."
+              class="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-[15px] text-slate-800 shadow-xs focus:border-[#1d6ce0] focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition"
+              spellcheck="false"
+            />
+            <button
+              id="tokenizeBtn"
+              type="button"
+              class="inline-flex items-center justify-center rounded-lg bg-[#1d6ce0] hover:bg-[#1d4ed8] active:scale-[0.99] text-white font-medium text-sm px-5 py-2.5 shadow-xs transition cursor-pointer shrink-0"
+            >
+              Tokenize
+            </button>
+          </div>
+        </div>
+
+        <!-- Visual Token Chips Strip -->
+        <div id="tokenChipsContainer" class="flex flex-wrap items-center gap-2 min-h-[58px] pt-1">
+          <!-- Token cards rendered dynamically -->
+        </div>
+
+        <!-- Subtle Helper Note with Green Left Border -->
+        <div class="border-l-4 border-[#10b981] pl-3 py-0.5 text-xs sm:text-sm text-slate-600">
+          Unknown words are broken into smaller pieces.
+        </div>
+
+        <!-- Output Token IDs and Metrics -->
+        <div class="space-y-1.5 text-sm text-slate-800">
+          <div class="font-mono text-xs sm:text-sm bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 overflow-x-auto">
+            <span class="font-sans font-semibold text-slate-700">Token IDs:</span>
+            <span id="tokenIdsDisplay" class="text-slate-900 ml-1">[1, 21, 59, 65, 46, 56, 64, 53, 4, 5]</span>
+          </div>
+          <div id="tokenMetricsDisplay" class="flex flex-wrap gap-x-5 gap-y-1 text-xs sm:text-sm text-slate-600 pt-0.5">
+            <span>Characters: <strong class="text-slate-900 font-semibold">19</strong></span>
+            <span>Tokens: <strong class="text-slate-900 font-semibold">10</strong></span>
+            <span>Characters per token: <strong class="text-slate-900 font-semibold">1.90</strong></span>
+          </div>
+        </div>
+
+        <!-- Educational Callout Box (Emerald Mint) -->
+        <div class="bg-[#ecfdf5] border-l-4 border-[#10b981] rounded-r-xl p-4 text-xs sm:text-sm leading-relaxed text-slate-800">
+          <strong class="font-semibold text-emerald-950">What you learn:</strong> computers read numbers, not words. A vocabulary is a dictionary that gives every token an ID. ID 0 is <code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">[UNK]</code> (unknown). A new word is broken into smaller pieces (<code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">z ##e ##b ##r ##a</code>), so the model never gets stuck. A smaller vocabulary means more pieces, so more tokens.
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- PART 2: EMBEDDINGS IN 3D                                              -->
+    <!-- ===================================================================== -->
+    <section id="part2-embeddings" class="bg-white border border-[#e2e8f0] rounded-2xl shadow-sm p-5 sm:p-8 space-y-6">
+      <div class="border-b border-slate-100 pb-4">
+        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Part 2: Embeddings in 3D</h2>
+      </div>
+
+      <!-- Sentences Input -->
+      <div class="space-y-2">
+        <label for="embeddingSentences" class="block text-sm font-semibold text-slate-800">
+          Sentences (one per line)
+        </label>
+        <textarea
+          id="embeddingSentences"
+          rows="9"
+          class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-[15px] leading-relaxed text-slate-800 shadow-xs focus:border-[#1d6ce0] focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition"
+          spellcheck="false"
+        >The cat sat on the mat.
+A kitten rested on the rug.
+The bat sat on the mat.
+I love programming in Python.
+Coding in Python is my passion.
+Pythons are large snakes.
+The stock market crashed today.
+Share prices fell sharply.
+hello my name is jashan</textarea>
+      </div>
+
+      <!-- Radio Mode Selection & Embed Button -->
+      <div class="space-y-3">
+        <div class="flex flex-wrap items-center gap-6" role="radiogroup" aria-label="Embedding method">
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-800">
+            <input
+              type="radio"
+              name="embeddingMode"
+              value="spelling"
+              checked
+              class="w-4 h-4 text-[#1d6ce0] border-slate-300 focus:ring-[#1d6ce0] cursor-pointer"
+            />
+            <span>Spelling-based</span>
+          </label>
+
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-800">
+            <input
+              type="radio"
+              name="embeddingMode"
+              value="meaning"
+              class="w-4 h-4 text-[#1d6ce0] border-slate-300 focus:ring-[#1d6ce0] cursor-pointer"
+            />
+            <span>Meaning-based</span>
+          </label>
+        </div>
+
+        <div>
+          <button
+            id="embedPlotBtn"
+            type="button"
+            class="inline-flex items-center justify-center rounded-lg bg-[#1d6ce0] hover:bg-[#1d4ed8] active:scale-[0.99] text-white font-medium text-sm px-4 py-2.5 shadow-xs transition cursor-pointer"
+          >
+            Embed and plot
+          </button>
+        </div>
+
+        <p id="embeddingDescText" class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          Spelling-based: each sentence = counts of its 3-letter groups. 9 sentences, 64 numbers each, squeezed down to 3 (x, y, z).
+        </p>
+      </div>
+
+      <!-- Interactive 3D Scatter Plot Container -->
+      <div class="relative rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <!-- Top Bar inside 3D Plot Card -->
+        <div class="flex items-center justify-between px-3.5 py-2 border-b border-slate-100 bg-slate-50/60 text-xs text-slate-500">
+          <div class="flex items-center gap-4">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#1d6ce0] inline-block"></span>
+              Reference sentences (1–8)
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#f97316] inline-block"></span>
+              9th+ / custom sentence
+            </span>
+          </div>
+          <button
+            id="resetViewBtn"
+            type="button"
+            class="text-[#1d6ce0] hover:text-[#1d4ed8] font-semibold text-xs px-2 py-1 rounded hover:bg-blue-50 transition cursor-pointer"
+          >
+            Reset view
+          </button>
+        </div>
+
+        <!-- Responsive 3D Canvas Wrapper -->
+        <div id="canvasWrapper" class="relative w-full h-[360px] sm:h-[430px] bg-white">
+          <canvas id="embeddingCanvas" class="w-full h-full block"></canvas>
+
+          <!-- Floating Hover / Tap Tooltip -->
+          <div
+            id="plotTooltip"
+            class="pointer-events-none hidden absolute z-20 max-w-[260px] rounded-xl bg-slate-900/95 text-white px-3 py-2.5 text-xs shadow-lg backdrop-blur-xs border border-slate-700/70 transition-opacity duration-75"
+          >
+            <div id="tooltipSentence" class="font-semibold text-white mb-1 leading-snug"></div>
+            <div id="tooltipCoords" class="font-mono text-[11px] text-slate-300"></div>
+          </div>
+
+          <!-- Bottom Subtle Interaction Hint -->
+          <div class="pointer-events-none absolute bottom-2.5 left-3.5 text-[11px] text-slate-400 select-none">
+            Drag to rotate &bull; Scroll to zoom &bull; Hover points for full sentence
+          </div>
+        </div>
+      </div>
+
+      <!-- Educational Callout Box for Part 2 -->
+      <div class="bg-[#ecfdf5] border-l-4 border-[#10b981] rounded-r-xl p-4 text-xs sm:text-sm leading-relaxed text-slate-800">
+        <strong class="font-semibold text-emerald-950">What you learn:</strong> embeddings turn sentences into points in 3D space. Spelling-based embeddings group words that look alike (<code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'cat'</code> and <code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'bat'</code>), while meaning-based embeddings group sentences with similar ideas (<code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'cat'</code> and <code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'kitten'</code>, or <code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'stock market'</code> and <code class="font-mono text-xs bg-emerald-100/80 px-1 py-0.5 rounded">'share prices'</code>) even when they share no words.
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================================= -->
+  <!-- APPLICATION LOGIC: TOKENIZER + 64-D EMBEDDINGS + 3D PCA SCATTER PLOT    -->
+  <!-- ======================================================================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* =====================================================================
+       * PART 1: WORDPIECE-STYLE EDUCATIONAL TOKENIZER
+       * ===================================================================== */
+
+      // 25 single-letter start pieces ('a'..'z' excluding 'q') + 26 continuation pieces ('##a'..'##z') = 51 letter pieces
+      const START_LETTERS = 'abcdefghijklmnoprstuvwxyz'.split(''); // 25 letters (excludes 'q')
+      const CONT_LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('').map(ch => '##' + ch); // 26 letters
+      const TOTAL_LETTER_PIECES = START_LETTERS.length + CONT_LETTERS.length; // 51
+
+      // Tokenizer state
+      let sortedCorpusWords = []; // Array of { token: string, count: number }
+      let keptWordCount = 20;
+      let activeVocabMap = new Map(); // token -> numeric ID
+
+      // DOM elements for Part 1
+      const trainingTextarea = document.getElementById('trainingSentences');
+      const buildVocabBtn = document.getElementById('buildVocabBtn');
+      const vocabSummaryText = document.getElementById('vocabSummaryText');
+      const wordsKeptSlider = document.getElementById('wordsKeptSlider');
+      const wordsKeptLabel = document.getElementById('wordsKeptLabel');
+      const vocabTableBody = document.getElementById('vocabTableBody');
+      const encodeInput = document.getElementById('encodeInput');
+      const tokenizeBtn = document.getElementById('tokenizeBtn');
+      const tokenChipsContainer = document.getElementById('tokenChipsContainer');
+      const tokenIdsDisplay = document.getElementById('tokenIdsDisplay');
+      const tokenMetricsDisplay = document.getElementById('tokenMetricsDisplay');
+
+      /**
+       * Splits text into lowercased words and standalone punctuation tokens.
+       * Example: "The cat sat." -> ["the", "cat", "sat", "."]
+       */
+      function preTokenize(text) {
+        if (!text || !text.trim()) return [];
+        const matches = text.toLowerCase().match(/[a-z0-9]+|[^\s\w]/g);
+        return matches ? matches : [];
+      }
+
+      /**
+       * Scans training sentences, counts word/punctuation frequencies,
+       * sorts descending by count (preserving first-appearance order on ties),
+       * and resets slider maximum.
+       */
+      function buildVocabularyFromTraining() {
+        const rawText = trainingTextarea.value;
+        const tokens = preTokenize(rawText);
+
+        const freqMap = new Map();
+        for (const tok of tokens) {
+          freqMap.set(tok, (freqMap.get(tok) || 0) + 1);
+        }
+
+        // Convert to array and sort by descending count (stable order on ties)
+        sortedCorpusWords = Array.from(freqMap.entries())
+          .map(([token, count]) => ({ token, count }))
+          .sort((a, b) => b.count - a.count);
+
+        const maxWords = sortedCorpusWords.length;
+        wordsKeptSlider.max = String(maxWords);
+        wordsKeptSlider.value = String(maxWords);
+        keptWordCount = maxWords;
+
+        updateVocabularyAndRender();
+      }
+
+      /**
+       * Rebuilds the ID lookup table for current `keptWordCount`, updates
+       * summary labels, renders the scrollable vocabulary table, and
+       * automatically re-tokenizes the current test sentence.
+       */
+      function updateVocabularyAndRender() {
+        const totalAvailable = sortedCorpusWords.length;
+        keptWordCount = Math.min(Math.max(0, parseInt(wordsKeptSlider.value, 10) || 0), totalAvailable);
+
+        const totalVocabSize = 1 + keptWordCount + TOTAL_LETTER_PIECES;
+
+        // Update summary text & slider label
+        vocabSummaryText.innerHTML =
+          `Vocabulary size: <span class="font-semibold text-slate-900">${totalVocabSize}</span> tokens = 1 [UNK] + <span class="font-semibold text-slate-900">${keptWordCount}</span> words + ${TOTAL_LETTER_PIECES} letter pieces`;
+        wordsKeptLabel.textContent = `Words kept: ${keptWordCount} of ${totalAvailable}`;
+
+        // Build lookup map & table rows
+        activeVocabMap.clear();
+        const rowsHtml = [];
+
+        // ID 0: [UNK]
+        activeVocabMap.set('[UNK]', 0);
+        rowsHtml.push(`
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="py-2 px-4 font-mono text-xs text-slate-500">0</td>
+            <td class="py-2 px-4 font-mono text-xs sm:text-sm font-medium text-slate-900">[UNK]</td>
+            <td class="py-2 px-4 text-xs sm:text-sm text-slate-500">unknown</td>
+          </tr>
+        `);
+
+        // IDs 1 .. keptWordCount: Top kept whole words / punctuation
+        let nextId = 1;
+        for (let i = 0; i < keptWordCount; i++) {
+          const item = sortedCorpusWords[i];
+          activeVocabMap.set(item.token, nextId);
+          rowsHtml.push(`
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-2 px-4 font-mono text-xs text-slate-500">${nextId}</td>
+              <td class="py-2 px-4 font-mono text-xs sm:text-sm font-medium text-slate-900">${escapeHtml(item.token)}</td>
+              <td class="py-2 px-4 text-xs sm:text-sm text-slate-600">${item.count}</td>
+            </tr>
+          `);
+          nextId++;
+        }
+
+        // Next 25 IDs: Single-letter start pieces ('a'..'z' excluding 'q')
+        for (const piece of START_LETTERS) {
+          activeVocabMap.set(piece, nextId);
+          rowsHtml.push(`
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-2 px-4 font-mono text-xs text-slate-500">${nextId}</td>
+              <td class="py-2 px-4 font-mono text-xs sm:text-sm text-slate-700">${piece}</td>
+              <td class="py-2 px-4 text-xs text-slate-400">letter piece</td>
+            </tr>
+          `);
+          nextId++;
+        }
+
+        // Final 26 IDs: Continuation pieces ('##a'..'##z')
+        for (const piece of CONT_LETTERS) {
+          activeVocabMap.set(piece, nextId);
+          rowsHtml.push(`
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-2 px-4 font-mono text-xs text-slate-500">${nextId}</td>
+              <td class="py-2 px-4 font-mono text-xs sm:text-sm text-slate-700">${piece}</td>
+              <td class="py-2 px-4 text-xs text-slate-400">letter piece</td>
+            </tr>
+          `);
+          nextId++;
+        }
+
+        vocabTableBody.innerHTML = rowsHtml.join('');
+
+        // Re-tokenize the sentence encoder input immediately
+        tokenizeInputSentence();
+      }
+
+      /**
+       * Encodes the user's input sentence using the current vocabulary:
+       * - Whole words/punctuation in the kept vocabulary get their word ID (mint-green chip)
+       * - Unknown words split into initial letter piece + '##' continuation pieces (sky-blue chip)
+       * - Characters missing from the letter set map to [UNK] (ID 0, sky-blue chip)
+       */
+      function tokenizeInputSentence() {
+        const rawSentence = encodeInput.value;
+        const charCount = rawSentence.length;
+        const words = preTokenize(rawSentence);
+
+        const encodedTokens = [];
+
+        for (const word of words) {
+          // Check if whole word/punctuation exists in the kept vocabulary
+          // Note: single letters like 'a' or 'i' in kept words (IDs 1..keptWordCount) match whole word first
+          const directId = activeVocabMap.get(word);
+          if (directId !== undefined && directId >= 1 && directId <= keptWordCount) {
+            encodedTokens.push({
+              text: word,
+              id: directId,
+              kind: 'word'
+            });
+          } else {
+            // Break unknown word into character pieces: first char + '##' continuation chars
+            const chars = Array.from(word);
+            chars.forEach((ch, idx) => {
+              const pieceKey = idx === 0 ? ch : '##' + ch;
+              const pieceId = activeVocabMap.get(pieceKey);
+              if (pieceId !== undefined) {
+                encodedTokens.push({
+                  text: pieceKey,
+                  id: pieceId,
+                  kind: 'piece'
+                });
+              } else {
+                encodedTokens.push({
+                  text: '[UNK]',
+                  id: 0,
+                  kind: 'unk'
+                });
+              }
+            });
+          }
+        }
+
+        // Render token chips
+        if (encodedTokens.length === 0) {
+          tokenChipsContainer.innerHTML =
+            '<span class="text-xs text-slate-400 italic py-2">Enter a sentence above to see its tokens and IDs.</span>';
+        } else {
+          tokenChipsContainer.innerHTML = encodedTokens
+            .map((tok, index) => {
+              const isWholeWord = tok.kind === 'word';
+              const bgClasses = isWholeWord
+                ? 'bg-[#dcfce7] border-[#86efac] text-emerald-950'
+                : 'bg-[#dbeafe] border-[#93c5fd] text-blue-950';
+              const idClasses = isWholeWord ? 'text-emerald-700' : 'text-blue-700';
+
+              return `
+                <div
+                  style="animation-delay: ${Math.min(index * 18, 250)}ms"
+                  class="token-chip inline-flex flex-col items-center justify-center min-w-[44px] px-2.5 py-1.5 rounded-lg border ${bgClasses} shadow-2xs select-none"
+                  title="${isWholeWord ? 'Known vocabulary word' : tok.kind === 'unk' ? 'Unknown token [UNK]' : 'Subword letter piece'}"
+                >
+                  <span class="font-mono text-xs sm:text-sm font-bold leading-tight">${escapeHtml(tok.text)}</span>
+                  <span class="font-mono text-[11px] font-medium ${idClasses} leading-tight mt-0.5">${tok.id}</span>
+                </div>
+              `;
+            })
+            .join('');
+        }
+
+        // Update Token IDs array and summary metrics
+        const idsArray = encodedTokens.map(t => t.id);
+        const tokenCount = encodedTokens.length;
+        const charsPerToken = tokenCount > 0 ? (charCount / tokenCount).toFixed(2) : '0.00';
+
+        tokenIdsDisplay.textContent = `[${idsArray.join(', ')}]`;
+        tokenMetricsDisplay.innerHTML = `
+          <span>Characters: <strong class="text-slate-900 font-semibold">${charCount}</strong></span>
+          <span>Tokens: <strong class="text-slate-900 font-semibold">${tokenCount}</strong></span>
+          <span>Characters per token: <strong class="text-slate-900 font-semibold">${charsPerToken}</strong></span>
+        `;
+      }
+
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // Wire Part 1 event listeners
+      buildVocabBtn.addEventListener('click', buildVocabularyFromTraining);
+      wordsKeptSlider.addEventListener('input', updateVocabularyAndRender);
+      tokenizeBtn.addEventListener('click', tokenizeInputSentence);
+      encodeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          tokenizeInputSentence();
+        }
+      });
+
+
+      /* =====================================================================
+       * PART 2: 64-D SENTENCE EMBEDDINGS & INTERACTIVE 3D PCA SCATTER PLOT
+       * ===================================================================== */
+
+      const EMBED_DIM = 64;
+      const embeddingTextarea = document.getElementById('embeddingSentences');
+      const embedPlotBtn = document.getElementById('embedPlotBtn');
+      const embeddingDescText = document.getElementById('embeddingDescText');
+      const resetViewBtn = document.getElementById('resetViewBtn');
+      const canvasWrapper = document.getElementById('canvasWrapper');
+      const canvas = document.getElementById('embeddingCanvas');
+      const ctx = canvas.getContext('2d');
+      const plotTooltip = document.getElementById('plotTooltip');
+      const tooltipSentence = document.getElementById('tooltipSentence');
+      const tooltipCoords = document.getElementById('tooltipCoords');
+
+      // Plotted points state
+      let plottedPoints = []; // Array of { sentence, shortLabel, x, y, z, isHighlight, screenX, screenY, screenR }
+      let hoveredPointIndex = -1;
+
+      // 3D Camera state (yaw, pitch, zoom)
+      const DEFAULT_CAMERA = { yaw: -0.58, pitch: 0.34, zoom: 1.0 };
+      let camera = { ...DEFAULT_CAMERA };
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let dragStartYaw = 0;
+      let dragStartPitch = 0;
+
+      /**
+       * Deterministic FNV-1a string hash -> unsigned 32-bit int
+       */
+      function hashString(str) {
+        let h = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+          h ^= str.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      }
+
+      /**
+       * L2-normalizes a Float64Array vector in-place.
+       */
+      function l2Normalize(vec) {
+        let sumSq = 0;
+        for (let i = 0; i < vec.length; i++) sumSq += vec[i] * vec[i];
+        const norm = Math.sqrt(sumSq);
+        if (norm > 1e-12) {
+          for (let i = 0; i < vec.length; i++) vec[i] /= norm;
+        }
+        return vec;
+      }
+
+      /**
+       * Builds a 64-dimensional Spelling-Based embedding for a sentence
+       * by counting overlapping 3-letter character groups (trigrams) into 64 bins.
+       */
+      function computeSpellingVector64(sentence) {
+        const vec = new Float64Array(EMBED_DIM);
+        const clean = sentence.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (clean.length < 3) {
+          vec[hashString(clean) % EMBED_DIM] = 1.0;
+          return vec;
+        }
+        for (let i = 0; i <= clean.length - 3; i++) {
+          const trigram = clean.slice(i, i + 3);
+          const bucket = hashString(trigram) % EMBED_DIM;
+          vec[bucket] += 1.0;
+        }
+        return l2Normalize(vec);
+      }
+
+      /**
+       * Builds a 64-dimensional Meaning-Based semantic vector for a sentence.
+       * Maps words/phrases to rich semantic concept dimensions (felines/pets,
+       * nocturnal animals, reptiles/snakes, coding/software, financial markets,
+       * personal greetings/introductions, action/states) so semantically related
+       * sentences cluster together even with zero overlapping words.
+       */
+      function computeMeaningVector64(sentence) {
+        const vec = new Float64Array(EMBED_DIM);
+        const lower = sentence.toLowerCase();
+        const words = lower.match(/[a-z0-9]+/g) || [];
+
+        // Semantic concept lexicons mapped onto orthogonal blocks of the 64-D space
+        const SEMANTIC_CONCEPTS = [
+          {
+            // Concept 0: Felines & cozy indoor pets
+            dims: [0, 1, 2, 3, 4, 5],
+            weight: 3.2,
+            keywords: ['cat', 'cats', 'kitten', 'kittens', 'feline', 'pet', 'pets', 'mat', 'rug', 'purr', 'meow', 'dog', 'puppy']
+          },
+          {
+            // Concept 1: Resting / sitting posture
+            dims: [6, 7, 8, 9],
+            weight: 1.5,
+            keywords: ['sat', 'sit', 'rested', 'rest', 'slept', 'sleep', 'lying', 'nap']
+          },
+          {
+            // Concept 2: Wild flying mammals (distinguishes 'bat' from 'cat')
+            dims: [10, 11, 12, 13, 14],
+            weight: 2.8,
+            keywords: ['bat', 'bats', 'wing', 'wings', 'cave', 'nocturnal', 'bird', 'owl']
+          },
+          {
+            // Concept 3: Software development & programming
+            dims: [15, 16, 17, 18, 19, 20, 21],
+            weight: 3.4,
+            keywords: ['programming', 'program', 'coding', 'code', 'developer', 'software', 'script', 'algorithm', 'passion', 'love', 'computer']
+          },
+          {
+            // Concept 4: Reptiles & snakes (disambiguates 'Pythons are large snakes' from coding)
+            dims: [22, 23, 24, 25, 26, 27],
+            weight: 3.5,
+            keywords: ['snake', 'snakes', 'reptile', 'reptiles', 'venom', 'scales', 'large', 'wild', 'jungle', 'lizard']
+          },
+          {
+            // Concept 5: Finance, equities & market downturns
+            dims: [28, 29, 30, 31, 32, 33, 34],
+            weight: 3.5,
+            keywords: ['stock', 'stocks', 'market', 'markets', 'share', 'shares', 'price', 'prices', 'crashed', 'crash', 'fell', 'drop', 'sharply', 'trading', 'economy', 'finance', 'investor']
+          },
+          {
+            // Concept 6: Personal introductions & greetings
+            dims: [35, 36, 37, 38, 39, 40],
+            weight: 3.5,
+            keywords: ['hello', 'hi', 'hey', 'greetings', 'name', 'jashan', 'am', 'myself', 'introduce']
+          },
+          {
+            // Concept 7: Nature, weather & outdoor parks
+            dims: [41, 42, 43, 44],
+            weight: 2.6,
+            keywords: ['sun', 'hot', 'today', 'park', 'ran', 'weather', 'sky', 'warm', 'outside']
+          }
+        ];
+
+        // Context-aware disambiguation for polysemous word "python" / "pythons"
+        const hasSnakeContext = words.some(w => ['snake', 'snakes', 'reptile', 'reptiles', 'large', 'jungle'].includes(w));
+        const hasCodeContext = words.some(w => ['programming', 'coding', 'code', 'software', 'developer', 'passion', 'love'].includes(w));
+
+        for (const w of words) {
+          if (w === 'python' || w === 'pythons') {
+            if (hasSnakeContext && !hasCodeContext) {
+              for (const d of [22, 23, 24, 25, 26]) vec[d] += 3.0;
+            } else {
+              for (const d of [15, 16, 17, 18, 19]) vec[d] += 3.0;
+            }
+          }
+
+          for (const concept of SEMANTIC_CONCEPTS) {
+            if (concept.keywords.includes(w)) {
+              for (const d of concept.dims) {
+                vec[d] += concept.weight;
+              }
+            }
+          }
+
+          // Subtle word-level semantic hash in remaining dimensions (45..63) for general sentences
+          const subDim = 45 + (hashString(w) % (EMBED_DIM - 45));
+          vec[subDim] += 0.45;
+        }
+
+        // Fallback if sentence had no recognized words
+        let normCheck = 0;
+        for (let i = 0; i < EMBED_DIM; i++) normCheck += vec[i] * vec[i];
+        if (normCheck < 1e-9) {
+          vec[hashString(lower) % EMBED_DIM] = 1.0;
+        }
+
+        return l2Normalize(vec);
+      }
+
+      /**
+       * Squeezes N x 64 vectors down to N x 3 (x, y, z) using Principal Component Analysis (PCA)
+       * via power iteration with Gram-Schmidt deflation and deterministic sign alignment.
+       */
+      function project64To3D(vectors) {
+        const n = vectors.length;
+        if (n === 0) return [];
+        if (n === 1) return [{ x: 0, y: 0, z: 0 }];
+
+        // 1. Compute mean vector across all N sentences
+        const mean = new Float64Array(EMBED_DIM);
+        for (let i = 0; i < n; i++) {
+          for (let d = 0; d < EMBED_DIM; d++) {
+            mean[d] += vectors[i][d];
+          }
+        }
+        for (let d = 0; d < EMBED_DIM; d++) mean[d] /= n;
+
+        // 2. Center the data matrix X (n x 64)
+        const centered = vectors.map(v => {
+          const c = new Float64Array(EMBED_DIM);
+          for (let d = 0; d < EMBED_DIM; d++) c[d] = v[d] - mean[d];
+          return c;
+        });
+
+        // 3. Compute 64 x 64 covariance matrix C = (X^T * X) / n
+        const cov = Array.from({ length: EMBED_DIM }, () => new Float64Array(EMBED_DIM));
+        for (let i = 0; i < n; i++) {
+          const row = centered[i];
+          for (let r = 0; r < EMBED_DIM; r++) {
+            const vr = row[r];
+            if (vr === 0) continue;
+            for (let c = r; c < EMBED_DIM; c++) {
+              cov[r][c] += vr * row[c];
+            }
+          }
+        }
+        for (let r = 0; r < EMBED_DIM; r++) {
+          for (let c = r; c < EMBED_DIM; c++) {
+            const val = cov[r][c] / n;
+            cov[r][c] = val;
+            cov[c][r] = val;
+          }
+        }
+
+        // 4. Extract top 3 orthogonal eigenvectors via power iteration + deflation
+        const basis = [];
+        for (let comp = 0; comp < 3; comp++) {
+          // Deterministic initial vector
+          let v = new Float64Array(EMBED_DIM);
+          for (let d = 0; d < EMBED_DIM; d++) {
+            v[d] = Math.sin((comp + 1) * (d + 1) * 0.73) + 0.5;
+          }
+          l2Normalize(v);
+
+          for (let iter = 0; iter < 60; iter++) {
+            // Multiply next = cov * v
+            const next = new Float64Array(EMBED_DIM);
+            for (let r = 0; r < EMBED_DIM; r++) {
+              let sum = 0;
+              const covRow = cov[r];
+              for (let c = 0; c < EMBED_DIM; c++) {
+                sum += covRow[c] * v[c];
+              }
+              next[r] = sum;
+            }
+
+            // Orthogonalize against previously found principal components
+            for (const prev of basis) {
+              let dot = 0;
+              for (let d = 0; d < EMBED_DIM; d++) dot += next[d] * prev[d];
+              for (let d = 0; d < EMBED_DIM; d++) next[d] -= dot * prev[d];
+            }
+
+            const norm = Math.sqrt(next.reduce((acc, val) => acc + val * val, 0));
+            if (norm < 1e-12) break;
+            for (let d = 0; d < EMBED_DIM; d++) v[d] = next[d] / norm;
+          }
+
+          // Deterministic sign alignment so axes don't randomly flip sign
+          let anchorSum = 0;
+          for (let d = 0; d < EMBED_DIM; d++) anchorSum += v[d] * (d + 1);
+          if (anchorSum < 0) {
+            for (let d = 0; d < EMBED_DIM; d++) v[d] = -v[d];
+          }
+
+          basis.push(v);
+        }
+
+        // 5. Project centered vectors onto the 3 principal axes and normalize into [-1, 1] cube
+        const rawCoords = centered.map(row => {
+          const coords = [0, 0, 0];
+          for (let comp = 0; comp < 3; comp++) {
+            let dot = 0;
+            const axis = basis[comp];
+            for (let d = 0; d < EMBED_DIM; d++) dot += row[d] * axis[d];
+            coords[comp] = dot;
+          }
+          return { x: coords[0], y: coords[1], z: coords[2] };
+        });
+
+        let maxAbs = 0;
+        for (const pt of rawCoords) {
+          maxAbs = Math.max(maxAbs, Math.abs(pt.x), Math.abs(pt.y), Math.abs(pt.z));
+        }
+        const scale = maxAbs > 1e-9 ? 0.88 / maxAbs : 1;
+
+        return rawCoords.map(pt => ({
+          x: pt.x * scale,
+          y: pt.y * scale,
+          z: pt.z * scale
+        }));
+      }
+
+      /**
+       * Formats a truncated label (first 3 words + "...") matching the reference UI.
+       */
+      function makeShortLabel(sentence) {
+        const words = sentence.trim().split(/\s+/);
+        if (words.length <= 3) return sentence.trim();
+        return words.slice(0, 3).join(' ') + '...';
+      }
+
+      /**
+       * Reads sentences, builds 64-D embeddings according to the selected radio mode,
+       * projects to 3D, updates description text, and renders the canvas.
+       */
+      function runEmbedAndPlot() {
+        const lines = embeddingTextarea.value
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
+
+        const modeInput = document.querySelector('input[name="embeddingMode"]:checked');
+        const mode = modeInput ? modeInput.value : 'spelling';
+
+        // Update description line dynamically
+        if (mode === 'spelling') {
+          embeddingDescText.textContent =
+            `Spelling-based: each sentence = counts of its 3-letter groups. ${lines.length} sentences, 64 numbers each, squeezed down to 3 (x, y, z).`;
+        } else {
+          embeddingDescText.textContent =
+            `Meaning-based: each sentence = semantic vector capturing topic & concept similarity. ${lines.length} sentences, 64 numbers each, squeezed down to 3 (x, y, z).`;
+        }
+
+        const vectors64 = lines.map(line =>
+          mode === 'spelling' ? computeSpellingVector64(line) : computeMeaningVector64(line)
+        );
+
+        const coords3D = project64To3D(vectors64);
+
+        plottedPoints = lines.map((sentence, idx) => ({
+          sentence,
+          shortLabel: makeShortLabel(sentence),
+          x: coords3D[idx].x,
+          y: coords3D[idx].y,
+          z: coords3D[idx].z,
+          isHighlight: idx >= 8, // 9th+ sentence highlighted in warm orange
+          screenX: 0,
+          screenY: 0,
+          screenR: idx >= 8 ? 7.5 : 5.5
+        }));
+
+        hoveredPointIndex = -1;
+        hideTooltip();
+        render3DPlot();
+      }
+
+      /**
+       * Rotates a 3D point (x, y, z) by camera yaw & pitch and projects to 2D canvas pixels.
+       */
+      function projectPoint3D(x, y, z, width, height) {
+        // Rotate around Y axis (yaw)
+        const cosY = Math.cos(camera.yaw);
+        const sinY = Math.sin(camera.yaw);
+        const x1 = x * cosY - z * sinY;
+        const z1 = x * sinY + z * cosY;
+
+        // Rotate around X axis (pitch)
+        const cosX = Math.cos(camera.pitch);
+        const sinX = Math.sin(camera.pitch);
+        const y2 = y * cosX - z1 * sinX;
+        const z2 = y * sinX + z1 * cosX;
+
+        // Perspective projection
+        const fov = 3.2;
+        const dist = fov / (fov + z2 + 1.8);
+        const baseScale = Math.min(width, height) * 0.44 * camera.zoom;
+
+        const screenX = width * 0.48 + x1 * baseScale * dist;
+        const screenY = height * 0.54 - y2 * baseScale * dist;
+
+        return { screenX, screenY, depth: z2, scale: dist };
+      }
+
+      /**
+       * Renders the 3D coordinate axes (x, y, z) and projected sentence points onto the canvas.
+       */
+      function render3DPlot() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvasWrapper.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+        }
+
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+
+        // Subtle background radial depth gradient
+        const bgGrad = ctx.createRadialGradient(
+          width * 0.5, height * 0.5, 20,
+          width * 0.5, height * 0.5, Math.max(width, height) * 0.65
+        );
+        bgGrad.addColorStop(0, '#ffffff');
+        bgGrad.addColorStop(1, '#f8fafc');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw 3D coordinate axes anchored cleanly near origin (0, 0, 0)
+        const origin = projectPoint3D(0, 0, 0, width, height);
+        const axisLen = 0.95;
+        const axes = [
+          { end: projectPoint3D(-axisLen, 0, 0, width, height), label: 'x', labelOffset: [-12, -6] },
+          { end: projectPoint3D(0, axisLen, 0, width, height), label: 'y', labelOffset: [0, -10] },
+          { end: projectPoint3D(0, 0, axisLen, width, height), label: 'z', labelOffset: [-10, 12] }
+        ];
+
+        ctx.lineWidth = 1.25;
+        ctx.strokeStyle = '#cbd5e1';
+        for (const axis of axes) {
+          ctx.beginPath();
+          ctx.moveTo(origin.screenX, origin.screenY);
+          ctx.lineTo(axis.end.screenX, axis.end.screenY);
+          ctx.stroke();
+
+          // Axis label ('x', 'y', 'z')
+          ctx.font = '600 13px Inter, system-ui, sans-serif';
+          ctx.fillStyle = '#475569';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            axis.label,
+            axis.end.screenX + axis.labelOffset[0],
+            axis.end.screenY + axis.labelOffset[1]
+          );
+        }
+
+        // Subtle origin dot
+        ctx.beginPath();
+        ctx.arc(origin.screenX, origin.screenY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fill();
+
+        // Project all points and sort back-to-front (painter's algorithm)
+        const renderList = plottedPoints.map((pt, index) => {
+          const proj = projectPoint3D(pt.x, pt.y, pt.z, width, height);
+          pt.screenX = proj.screenX;
+          pt.screenY = proj.screenY;
+          return { pt, index, depth: proj.depth, scale: proj.scale };
+        });
+
+        renderList.sort((a, b) => b.depth - a.depth);
+
+        // Draw points and their text labels
+        for (const item of renderList) {
+          const { pt, index, scale } = item;
+          const isHovered = index === hoveredPointIndex;
+          const baseR = pt.isHighlight ? 7.5 : 5.5;
+          const radius = Math.max(4, baseR * (0.75 + 0.35 * scale)) + (isHovered ? 2.5 : 0);
+
+          const fillColor = pt.isHighlight ? '#f97316' : '#1d6ce0';
+          const haloColor = pt.isHighlight ? 'rgba(249, 115, 22, 0.22)' : 'rgba(29, 108, 224, 0.20)';
+
+          // Hover halo ring
+          if (isHovered) {
+            ctx.beginPath();
+            ctx.arc(pt.screenX, pt.screenY, radius + 5, 0, Math.PI * 2);
+            ctx.fillStyle = haloColor;
+            ctx.fill();
+          }
+
+          // Point circle
+          ctx.beginPath();
+          ctx.arc(pt.screenX, pt.screenY, radius, 0, Math.PI * 2);
+          ctx.fillStyle = fillColor;
+          ctx.fill();
+
+          // Crisp white outline
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+
+          // Truncated sentence label beside the dot
+          ctx.font = `${isHovered || pt.isHighlight ? '600' : '500'} 12px Inter, system-ui, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+
+          const labelX = pt.screenX + radius + 6;
+          const labelY = pt.screenY;
+
+          // Subtle white text halo for readability when labels overlap
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+          ctx.strokeText(pt.shortLabel, labelX, labelY);
+
+          ctx.fillStyle = pt.isHighlight ? '#c2410c' : isHovered ? '#0f172a' : '#334155';
+          ctx.fillText(pt.shortLabel, labelX, labelY);
+        }
+
+        ctx.restore();
+      }
+
+      /**
+       * Hit-tests pointer coordinates against projected 3D points.
+       */
+      function findPointAt(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const px = clientX - rect.left;
+        const py = clientY - rect.top;
+
+        let closestIdx = -1;
+        let closestDist = 18; // generous hit radius in px
+
+        for (let i = 0; i < plottedPoints.length; i++) {
+          const pt = plottedPoints[i];
+          const dx = px - pt.screenX;
+          const dy = py - pt.screenY;
+          const dist = Math.hypot(dx, dy);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closestIdx = i;
+          }
+        }
+        return { index: closestIdx, relX: px, relY: py, rect };
+      }
+
+      function showTooltip(pt, relX, relY, rect) {
+        tooltipSentence.textContent = `"${pt.sentence}"`;
+        tooltipCoords.textContent = `x: ${pt.x.toFixed(2)}, y: ${pt.y.toFixed(2)}, z: ${pt.z.toFixed(2)}`;
+
+        plotTooltip.classList.remove('hidden');
+
+        // Position tooltip smartly within canvas bounds
+        const tipWidth = plotTooltip.offsetWidth || 200;
+        const tipHeight = plotTooltip.offsetHeight || 56;
+        let left = relX + 14;
+        let top = relY - tipHeight - 10;
+
+        if (left + tipWidth > rect.width - 10) {
+          left = Math.max(10, relX - tipWidth - 14);
+        }
+        if (top < 10) {
+          top = relY + 16;
+        }
+
+        plotTooltip.style.left = `${left}px`;
+        plotTooltip.style.top = `${top}px`;
+      }
+
+      function hideTooltip() {
+        plotTooltip.classList.add('hidden');
+      }
+
+      // Mouse & Touch 3D Orbit Rotation + Hover Inspection
+      canvas.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragStartYaw = camera.yaw;
+        dragStartPitch = camera.pitch;
+        canvas.setPointerCapture(e.pointerId);
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (isDragging) {
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          camera.yaw = dragStartYaw + dx * 0.0085;
+          camera.pitch = Math.max(-1.45, Math.min(1.45, dragStartPitch + dy * 0.0085));
+          hideTooltip();
+          render3DPlot();
+          return;
+        }
+
+        const hit = findPointAt(e.clientX, e.clientY);
+        if (hit.index !== hoveredPointIndex) {
+          hoveredPointIndex = hit.index;
+          render3DPlot();
+        }
+        if (hit.index !== -1) {
+          canvas.style.cursor = 'pointer';
+          showTooltip(plottedPoints[hit.index], hit.relX, hit.relY, hit.rect);
+        } else {
+          canvas.style.cursor = 'grab';
+          hideTooltip();
+        }
+      });
+
+      canvas.addEventListener('pointerup', (e) => {
+        if (isDragging) {
+          isDragging = false;
+          try {
+            canvas.releasePointerCapture(e.pointerId);
+          } catch (_) {}
+        }
+      });
+
+      canvas.addEventListener('pointerleave', () => {
+        isDragging = false;
+        hoveredPointIndex = -1;
+        hideTooltip();
+        render3DPlot();
+      });
+
+      // Scroll-wheel zoom on 3D canvas
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        camera.zoom = Math.max(0.45, Math.min(2.6, camera.zoom * zoomFactor));
+        hideTooltip();
+        render3DPlot();
+      }, { passive: false });
+
+      // Reset view button
+      resetViewBtn.addEventListener('click', () => {
+        camera = { ...DEFAULT_CAMERA };
+        hoveredPointIndex = -1;
+        hideTooltip();
+        render3DPlot();
+      });
+
+      // Embed and plot button + radio buttons
+      embedPlotBtn.addEventListener('click', runEmbedAndPlot);
+      document.querySelectorAll('input[name="embeddingMode"]').forEach(radio => {
+        radio.addEventListener('change', runEmbedAndPlot);
+      });
+
+      // Responsive canvas resize observer
+      window.addEventListener('resize', render3DPlot);
+
+      // Initialize both sections on page load
+      window.addEventListener('DOMContentLoaded', () => {
+        buildVocabularyFromTraining();
+        runEmbedAndPlot();
+      });
+    })();
+  </script>
+</body>
+</html>
